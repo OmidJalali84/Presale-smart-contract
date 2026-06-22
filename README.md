@@ -1,92 +1,147 @@
 # Presale Contract
 
-This repository contains the implementation of a **Presale Contract** developed using Hardhat and Solidity. The contract facilitates the sale of ERC20 tokens during a specified presale period, supporting payments in Ether (ETH) and USDT.
+> One of my first Solidity projects — kept here as a reminder of where it all started.
 
-## Features
-
-- **Token Sales:** Users can purchase tokens with Ether or USDT.
-- **Price Feeds:** Utilizes Chainlink for real-time ETH/USD price conversion.
-- **Gift Codes:** Tracks purchases associated with unique gift codes.
-- **Owner Management:** Allows the owner to update prices, withdraw funds, and manage presale tokens.
-- **Presale Period:** Ensures token sales occur only during the defined period.
-- **Secure Transactions:** Implements reentrancy protection for safe token transfers.
+A token presale smart contract built with Hardhat and Solidity, deployed on the Ethereum Sepolia testnet. It supports purchasing ERC20 tokens using either ETH or USDT, with real-time ETH/USD pricing via Chainlink oracles.
 
 ---
 
-## Contract Details
+## Overview
 
-### Constructor Parameters
+The `Presale` contract manages a time-bounded token sale. Buyers can purchase tokens with ETH (price calculated live from Chainlink) or USDT (at a fixed USD price). The owner can update the price, withdraw funds, and recover unsold tokens once the presale ends.
 
-The contract requires the following parameters during deployment:
-
-1. **`_tokenPrice`** - Price of 1 token in USD (multiplied by `1e-3`).
-2. **`_tokensForSale`** - Total number of tokens available for sale.
-3. **`_openingTime`** - Presale opening timestamp.
-4. **`_closingTime`** - Presale closing timestamp.
-5. **`_priceFeedAddress`** - Address of the Chainlink price feed.
-6. **`_token`** - Address of the ERC20 token to be sold.
-7. **`_usdtToken`** - Address of the USDT token contract.
-8. **`_owner`** - Address of the contract owner.
+A gift code system tracks which referral code drove each purchase — useful for affiliate or campaign analytics.
 
 ---
 
-## Functions Overview
+## Tech Stack
 
-### Public Functions
+- **Solidity** `^0.8.19`
+- **Hardhat** — compilation, testing, deployment, gas reporting
+- **OpenZeppelin** — ERC20, ReentrancyGuard
+- **Chainlink** — ETH/USD price feed (`AggregatorV3Interface`)
+- **hardhat-deploy** — scripted multi-network deployments
+- **Ethers.js v6** — contract interaction in tests
 
-- **`buyTokensWithEther(uint256 giftCode)`**  
-  Purchases tokens using Ether. Accepts a `giftCode` to track associated purchases.
+---
 
-- **`buyTokensWithUSDT(uint256 amount, uint256 giftCode)`**  
-  Purchases tokens using USDT. Accepts an `amount` and a `giftCode`.
+## Contract Features
 
-- **`getRemainingTokens()`**  
-  Returns the number of tokens still available for sale.
+- Buy tokens with **ETH** — amount calculated from live Chainlink price feed
+- Buy tokens with **USDT** — fixed USD price per token
+- **Gift code tracking** — each purchase can be tagged with a numeric code
+- **Reentrancy guard** on all purchase functions
+- **Time-gated** — purchases only accepted between `openingTime` and `closingTime`
+- Owner functions: `changePrice`, `changeOwner`, `withdrawEther`, `withdrawToken`, `endPresale`
 
-### Owner Functions
+---
 
-- **`changePrice(uint256 newPrice)`**  
-  Updates the token price.
+## Project Structure
 
-- **`changeOwner(address payable newOwner)`**  
-  Transfers ownership of the contract.
+```
+contracts/
+├── Presale.sol                  # Main presale contract
+├── Mocks/
+│   └── MockV3Aggregator.sol     # Chainlink mock for local testing
+└── tokens/
+    ├── SendingToken.sol         # Token being sold (ST)
+    └── ReceivingToken.sol       # Token used as USDT mock (RT)
 
-- **`withdrawEther()`**  
-  Withdraws all accumulated Ether to the owner's wallet.
+deploy/
+├── 00-deploy-mocks.js
+├── 01-deploy-RT.js
+├── 02-deploy-ST.js
+└── 03-deploy-ICO.js
 
-- **`withdrawToken(uint256 amount)`**  
-  Withdraws a specified amount of tokens to the owner.
+test/
+└── unit.test.js
 
-- **`endPresale()`**  
-  Ends the presale and transfers remaining tokens to the owner.
+helper-hardhat.config.js         # Deployment args (price, supply, timing)
+```
+
+---
+
+## Getting Started
+
+### Install dependencies
+
+```bash
+npm install
+```
+
+### Set up environment variables
+
+Copy `.env.example` to `.env` and fill in:
+
+```env
+SEPOLIA_RPC_URL=
+PRIVATE_KEY=
+ETHERSCAN_API_KEY=
+COINMARKETCAP_API_KEY=
+```
+
+### Run locally
+
+```bash
+# Start a local Hardhat node
+npx hardhat node
+
+# Deploy to local network
+npx hardhat deploy --network hardhat
+```
+
+### Run tests
+
+```bash
+npx hardhat test
+```
+
+### Deploy to Sepolia
+
+```bash
+npx hardhat deploy --network sepolia
+```
+
+### Verify on Etherscan
+
+Verification runs automatically after Sepolia deployment if `ETHERSCAN_API_KEY` is set.
+
+---
+
+## Deployed Contracts (Sepolia)
+
+| Contract | Address |
+|---|---|
+| Presale (ICO) | `0xA1F06372Ed2062f24dE85bEdB1C4B90C1900A56e` |
+| Hope Token | `0x10fa6759aEc16e20bc7d1ceD9Dc0774C4798DD9e` |
+
+---
+
+## Constructor Parameters
+
+| Parameter | Description |
+|---|---|
+| `_tokenPrice` | Price per token in USD (scaled by `1e-3`) |
+| `_tokensForSale` | Total token supply available for sale |
+| `_openingTime` | Unix timestamp for presale start |
+| `_closingTime` | Unix timestamp for presale end |
+| `_priceFeedAddress` | Chainlink ETH/USD aggregator address |
+| `_token` | Address of the ERC20 token being sold |
+| `_usdtToken` | Address of the USDT token contract |
+| `_owner` | Owner/admin address |
 
 ---
 
 ## Events
 
-- **`TokensPurchased(address indexed purchaser, uint256 amount)`**  
-  Emitted when tokens are purchased.
-
-- **`PresaleEnded(uint256 tokensSold)`**  
-  Emitted when the presale ends.
-
-- **`Withdrawal(address indexed owner, uint256 amount)`**  
-  Emitted when funds are withdrawn by the owner.
-
----
-
-## Security Considerations
-
-- Implements reentrancy guard (`nonReentrant`) to prevent reentrancy attacks.
-- Ensures presale functions only operate during the specified presale period (`onlyWhileOpen`).
-- Transfers funds and tokens securely using OpenZeppelin libraries.
+| Event | Emitted when |
+|---|---|
+| `TokensPurchased(address, uint256)` | A buyer successfully purchases tokens |
+| `PresaleEnded(uint256)` | Owner calls `endPresale` after closing time |
+| `Withdrawal(address, uint256)` | Owner withdraws ETH from the contract |
 
 ---
 
 ## License
 
-This project is licensed under the **MIT License**. See the LICENSE file for details.
-
----
-
-Feel free to contribute or raise issues to improve this project! 🚀
+MIT
